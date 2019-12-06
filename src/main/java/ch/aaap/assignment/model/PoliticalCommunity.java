@@ -10,7 +10,9 @@ public interface PoliticalCommunity {
 
   public String getShortName();
 
-  public LocalDate getLastUpdate();
+  public Canton getCanton();
 
-  // TODO add more features here representing the relations
+  public District getDistrict();
+
+  public LocalDate getLastUpdate();
 }

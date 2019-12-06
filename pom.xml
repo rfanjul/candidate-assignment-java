@@ -58,5 +58,12 @@
 			<version>5.5.2</version>
 			<scope>test</scope>
 		</dependency>
+
+		<!-- format code -->
+		<dependency>
+			<groupId>com.google.googlejavaformat</groupId>
+			<artifactId>google-java-format</artifactId>
+			<version>1.7</version>
+		</dependency>
 	</dependencies>
 </project>
