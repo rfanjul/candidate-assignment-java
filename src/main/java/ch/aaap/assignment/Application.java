@@ -14,12 +14,18 @@ import ch.aaap.assignment.raw.CSVPoliticalCommunity;
 import ch.aaap.assignment.raw.CSVPostalCommunity;
 import ch.aaap.assignment.raw.CSVUtil;
 import java.time.LocalDate;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
 
 public class Application {
+
+  final Map<String, PostalCommunity> zipCodeToPostalCommunity = new HashMap<>();
+  final Map<String, PostalCommunity> numberToPostalCommunity = new HashMap<>();
+  final Map<String, PostalCommunity> nameToPostalCommunity = new HashMap<>();
 
   private Model model = null;
 
@@ -38,7 +44,6 @@ public class Application {
     Set<CSVPostalCommunity> postalCommunities = CSVUtil.getPostalCommunities();
 
     //
-
     final Set<District> districts = new HashSet<>();
     final Set<Canton> cantons = new HashSet<>();
 
@@ -63,6 +68,7 @@ public class Application {
                   }
 
                   return new PoliticalCommunityImpl(
+                      // return new PoliticalCommunityExt(
                       o.getNumber(),
                       o.getName(),
                       o.getShortName(),
@@ -75,13 +81,21 @@ public class Application {
     Set<PostalCommunity> postalCo =
         postalCommunities.stream()
             .map(
-                o ->
-                    new PostalCommunityImpl(
-                        o.getZipCode(),
-                        o.getZipCodeAddition(),
-                        o.getName(),
-                        o.getCantonCode(),
-                        o.getPoliticalCommunityNumber()))
+                o -> {
+                  PostalCommunityImpl postalCommunity =
+                      new PostalCommunityImpl(
+                          o.getZipCode(),
+                          o.getZipCodeAddition(),
+                          o.getName(),
+                          o.getCantonCode(),
+                          o.getPoliticalCommunityNumber());
+
+                  zipCodeToPostalCommunity.put(o.getZipCode(), postalCommunity);
+                  numberToPostalCommunity.put(o.getPoliticalCommunityNumber(), postalCommunity);
+                  nameToPostalCommunity.put(o.getName(), postalCommunity);
+
+                  return postalCommunity;
+                })
             .collect(Collectors.toSet());
 
     // TODO implementation
@@ -131,7 +145,7 @@ public class Application {
    * @param district number of a district (e.g. 101)
    * @return amount of districts in given canton
    */
-  public long getAmountOfPoliticalCommunitiesInDistict(String districtNumber) {
+  public long getAmountOfPoliticalCommunitiesInDistrict(String districtNumber) {
     // TODO implementation
     long num =
         model.getPoliticalCommunities().stream()
@@ -153,14 +167,16 @@ public class Application {
    */
   public String getDistrictForZipCode(String zipCode) {
 
-    PostalCommunity postalCommunity =
-        model.getPostalCommunities().stream()
-            .filter(o -> o.getZipCode().equals(zipCode))
-            .findFirst()
-            .orElseThrow(IllegalArgumentException::new);
-
     return model.getPoliticalCommunities().stream()
-        .filter(o -> o.getNumber().equals(postalCommunity.getPoliticalCommunityNumber()))
+        .filter(
+            o -> {
+              if (zipCodeToPostalCommunity.containsKey(zipCode)) {
+                return o.getNumber()
+                    .equals(zipCodeToPostalCommunity.get(zipCode).getPoliticalCommunityNumber());
+              }
+
+              return false;
+            })
         .findFirst()
         .orElseThrow(IllegalArgumentException::new)
         .getDistrict()
@@ -174,22 +190,20 @@ public class Application {
   public LocalDate getLastUpdateOfPoliticalCommunityByPostalCommunityName(
       String postalCommunityName) {
 
-    PostalCommunity postalCommunity =
-        model.getPostalCommunities().stream()
-            .filter(o -> o.getName().equals(postalCommunityName))
-            .findFirst()
-            .orElseThrow(IllegalArgumentException::new);
+    PostalCommunity postalCommunity;
+    if (nameToPostalCommunity.containsKey(postalCommunityName)) {
+      postalCommunity = nameToPostalCommunity.get(postalCommunityName);
+    } else {
+      throw new IllegalArgumentException();
+    }
 
-    TreeSet<LocalDate> updates = new TreeSet<>();
-    // TODO implementation
-    model.getPoliticalCommunities().stream()
-        .filter(o -> o.getNumber().equals(postalCommunity.getPoliticalCommunityNumber()))
-        .forEach(
-            politicalCommunity -> {
-              updates.add(politicalCommunity.getLastUpdate());
-            });
+    TreeSet<LocalDate> updates =
+        model.getPoliticalCommunities().stream()
+            .filter(o -> postalCommunity.getPoliticalCommunityNumber().equals(o.getNumber()))
+            .map(PoliticalCommunity::getLastUpdate)
+            .collect(Collectors.toCollection(TreeSet::new));
 
-    return updates.pollLast();
+    return updates.pollFirst();
   }
 
   /**
@@ -208,14 +222,9 @@ public class Application {
    * @return amount of political communities without postal communities
    */
   public long getAmountOfPoliticalCommunityWithoutPostalCommunities() {
-    // TODO implementation
+
     return model.getPoliticalCommunities().stream()
-        .filter(
-            o ->
-                model.getPostalCommunities().stream()
-                        .filter(a -> a.getPoliticalCommunityNumber().equals(o.getNumber()))
-                        .count()
-                    == 0)
+        .filter(o -> !numberToPostalCommunity.containsKey(o.getNumber()))
         .count();
   }
 }
